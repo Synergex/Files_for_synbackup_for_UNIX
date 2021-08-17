@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# synergy:       Starts the Synergy synbackup system
+#
+# chkconfig: 2345 95 90
+# description: Starts and stops the Synergy synbackup system
+#
+
+case "$1" in
+start )
+	SYNBACKUP=1
+	export SYNBACKUP
+	if [ -f /usr2/test1033d_32/synergyde/dbl/bin/synbackup ]; then
+	    DBLDIR=/usr2/test1033d_32/synergyde/dbl
+	    export DBLDIR
+	    echo -n $"Starting Synergy synbackup "
+	    /usr2/test1033d_32/synergyde/dbl/bin/synbackup -c
+	fi
+	;;
+
+stop )
+	SYNBACKUP=1
+	export SYNBACKUP
+	if [ -f /usr2/test1033d_32/synergyde/dbl/bin/synbackup ]; then
+	    DBLDIR=/usr2/test1033d_32/synergyde/dbl
+	    export DBLDIR
+	    echo -n $"Shutting down Synergy synbackup "
+	    /usr2/test1033d_32/synergyde/dbl/bin/synbackup -d
+	fi
+   ;;
+*)
+	echo "Usage: $0 (start | stop)"
+	exit 1
+esac

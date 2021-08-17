@@ -1,0 +1,285 @@
+#!/bin/bash
+
+#############################################################################################################
+#  File:     bpstart_notify[.POLICYNAME[.SCHEDULENAME]]
+#            bpend_notify[.POLICYNAME[.SCHEDULENAME]]
+#  Purpose:  bpstart_notify    is called by NetBackup Client at the start of a backup.
+#            bpend_notify      is called by NetBackup Client at the end   of a backup.
+#
+#  Vers    Date          Who    Description
+#  ----    ----          ---    -----------
+#  v0.01   14-Apr-2016   sdo    Initial draft.
+#  v0.02   16-APR-2016   sdo    Fix NBU version file.  Handle both start and end.
+#  v0.03   16-APR-2016   sdo    List contents of application script.  Show whoami.
+#  v0.04   16-APR-2016   sdo    bpstart_notify receives 4 parameters, bpend_notify receives 5 parameters.
+#  v0.05   19-APR-2016   sdo    Call the application script as user "appadmin".
+#  v0.06   20-APR-2016   sdo    Added steps to show application status before and after application call.
+#############################################################################################################
+SCRIPT_VERSION="v0.06"
+#############################################################################################################
+#  !!! WARNING and DISCLAIMER !!!
+#  !!! WARNING and DISCLAIMER !!!
+#  !!! WARNING and DISCLAIMER !!!
+#
+#  Before using this script, be aware of the following points:
+#  - Use of this script is entirely at the end user's own risk.
+#  - Neither the author of this script, nor Veritas, will accept any responsbility for issues or
+#    problems or data loss caused by use, or mis-use, of this script, in either its original form or
+#    a modified form.
+#  - This script is not endorsed by Veritas.
+#  - This script is not supported by Veritas.
+#  - This script has not been tested by Veritas.
+#  - This script may not be suitable for use in any given NetBackup environment.
+#  - This script is furnished on an example basis only.
+#  - Whilst every effort has been made, by the author of this script, to produce something that is
+#    useful and viable, bugs and errors may exist which may cause data loss.
+#############################################################################################################
+#  Notes
+#  -----
+#  1) Both bpstart_notify and bpend_notify must run silently and not generate any output at all on stdout nor
+#     on stderr.
+#  2) The Unix/Linux based bpstart_notify scripts do not return their result via "results" file, as the
+#     Windows versions do.  Instead "bpstart_notify" returns an "exist status".
+#  3) The scripts are called by NetBackup Client, and are waited for, up to to a certain client timeout
+#     value.
+#  4) With default NetBackup Client settings, then if either script takes more than five minutes (i.e. 300
+#     seconds) to complete, then the backup jobs will be considered as havng failed.
+#  5) It its current v0.06 form, this script does not handle multi-streaming.
+#############################################################################################################
+
+function abort {
+  log "Script aborting..."
+  if [ -z "$STS"  ] ; then STS=-1; fi
+  if [ $STS -eq 0 ] ; then STS=-1; fi
+  exit $STS
+}
+
+function log {
+  LOGDT=`date "+%d/%m/%Y %H:%M:%S"`
+# Uncomment this next line during testing..."
+# echo "$LOGDT  $1"
+  if [ $DOLOGGING -ne 0 ]
+  then
+    echo "$LOGDT  $1">>"$FILELOG"
+  fi
+# sleep 0.1
+}
+
+#################################################################################
+#################################################################################
+# Set DOLOGGING to 1 for testing
+DOLOGGING=1
+
+SCRIPT_PATH="`dirname $0`"
+SCRIPT_PATH="`readlink -f ""$SCRIPT_PATH""`"
+SCRIPT_NAME="`basename $0`"
+SCRIPT_NAME="${SCRIPT_NAME%%.*}"
+
+FILELOG="$SCRIPT_PATH/$SCRIPT_NAME.log"
+FILETMP="$SCRIPT_PATH/$SCRIPT_NAME.tmp"
+
+#don't delete the log file, instead accumulate the log file...
+#if [ -e "$FILELOG" ] ; then rm "$FILELOG" ; fi
+ if [ -e "$FILETMP" ] ; then rm "$FILETMP" ; fi
+
+((STEP=0))
+
+#################################################################################
+#################################################################################
+
+((STEP++))
+
+log ""
+log ""
+log "Step $STEP - show script details..."
+log "...script name:     $SCRIPT_NAME"
+log "...script path:     $SCRIPT_PATH"
+log "...script log:      $FILELOG"
+log "...script version:  $SCRIPT_VERSION"
+log "...done..."
+
+#################################################################################
+#################################################################################
+
+((STEP++))
+
+log ""
+log "Step $STEP - show server details..."
+log "...OS kernel:     `uname -r`"
+log ".. OS date:       `uname -v`"
+OS=`uname -s`
+if [ "${OS}" = "Linux" ] ; then
+  log "...OS platform:   `uname -m -p -i -o`"
+  if [ -f /etc/redhat-release ] ; then
+    log "...OS release:    `cat /etc/redhat-release`"
+  elif [ -f /etc/SuSE-release ] ; then
+    log "...OS release:    `cat /etc/SuSE-release`"
+  elif [ -f /etc/mandrake-release ] ; then
+    log "...OS release:    `cat /etc/mandrake-release`"
+  elif [ -f /etc/debian_version ] ; then
+    log "...OS release:    `cat /etc/debian_version`"
+  fi
+elif [ "${OS}" = "AIX" ] ; then
+  log "...OS platform:   `uname -m -p`"
+  log "...OS release:    `oslevel -r`"
+elif [ "${OS}" = "SunOS" ] ; then
+  log "...OS platform:   `uname -m -p -i`"
+  log "...OS release:    `uname -r`"
+fi
+log "...hostname:      $HOSTNAME"
+log "...process ID:    $$"
+log "...num params:    $#"
+log "...username:      `whoami`"
+log "...current path:  `pwd`"
+log "...done..."
+
+#################################################################################
+#################################################################################
+
+((STEP++))
+
+log ""
+log "Step $STEP - show NetBackup details..."
+log "...NetBackup version:  `cat /usr/openv/netbackup/bin/version`"
+log ".. client name:        $1"
+log "...policy name:        $2"
+log "...schedule name:      $3"
+log "...schedule type:      $4"
+log "...parameter 5:        $5"
+log "...BACKUPID:           $BACKUPID"
+log "...BACKUPTIME:         $BACKUPTIME"
+log "...STREAM_NUMBER:      $STREAM_NUMBER"
+log "...STREAM_COUNT:       $STREAM_COUNT"
+log "...STREAM_PID:         $STREAM_PID"
+
+if [ "`echo $SCRIPT_NAME | cut -d "_" -f 1`" = "bpstart" ]
+then
+  SCRIPT_MODE="bpstart"
+else
+  if [ "`echo $SCRIPT_NAME | cut -d "_" -f 1`" = "bpend" ]
+  then
+    SCRIPT_MODE="bpend"
+  else
+    log "...unable to determine script mode from file name of NetBackup script name, script aboting..."
+    abort
+  fi
+fi
+
+if [ "$SCRIPT_MODE" = "bpstart" ]
+then
+  if [ "$#" -ne 4 ]
+  then
+    log "...incorrect number of parameters '$#', expected '4', script aborting..."
+    abort
+  fi
+else
+  if [ "$#" -ne 5 ]
+  then
+    log "...incorrect number of parameters '$#', expected '5', script aborting..."
+    abort
+  fi
+fi
+
+if [ "$SCRIPT_MODE" = "bpstart" ]
+then
+  log "...RESTARTED:          $RESTARTED"
+else
+  log "...FINISHED:           $FINISHED"
+fi
+
+log "...done..."
+
+#################################################################################
+#################################################################################
+
+((STEP++))
+
+log ""
+log "Step $STEP - show current application status, before taking action..."
+
+#command-to-display-application-status >>"$FILELOG" 2>&1
+STSDSP=$?
+
+log "...return status from application show was '$STSDSP', script continuing..."
+
+log "...done..."
+
+#################################################################################
+#################################################################################
+
+((STEP++))
+
+log ""
+log "Step $STEP - locate and call script to start/stop application..."
+
+APP_SCRIPT_LOCATION="/home/SYNERGEX/galen/scripts"
+if [ "$SCRIPT_MODE" = "bpstart" ]
+then
+  APP_SCRIPT="$APP_SCRIPT_LOCATION/stop_APP.sh"
+else
+  APP_SCRIPT="$APP_SCRIPT_LOCATION/start_APP.sh"
+fi
+
+log "...the application script file to call is named:  $APP_SCRIPT"
+
+if [ ! -e "$APP_SCRIPT" ]
+then
+  log "...unable to locate application script file, script aborting..."
+  abort
+fi
+
+if [ $DOLOGGING -ne 0 ]
+then
+  log "...listing application script file..."
+  ls -lash $APP_SCRIPT >>"$FILELOG" 2>&1
+
+  log "...showing application script file contents..."
+  cat $APP_SCRIPT >>"$FILELOG" 2>&1
+
+  log "...calling application script..."
+  bash $APP_SCRIPT >> "$FILELOG" 2>&1
+  #su -c $APP_SCRIPT appadmin >>"$FILELOG" 2>&1
+else
+  bash $APP_SCRIPT #>> "$FILELOG" 2>&1
+  #su -c $APP_SCRIPT appadmin >>"$FILELOG" 2>&1
+fi
+
+STS=$?
+if [ $STS -ne 0 ]
+then
+  if [ "$SCRIPT_MODE" = "bpstart" ]
+  then
+# comment and uncomment the next one/two/three lines to change the behaviour of this script...
+    log "...call to application script failed, status '$STS', script continuing..."
+#   log "...call to application script failed, status '$STS', script aborting..."
+#   abort
+  else
+    log "...call to application script failed, status '$STS', script aborting..."
+    abort
+  fi
+fi
+
+log "...done..."
+
+#################################################################################
+#################################################################################
+
+((STEP++))
+
+log ""
+log "Step $STEP - show current application status, after taking action..."
+
+#command-to-show-application-status >>"$FILELOG" 2>&1
+STSDSP=$?
+
+log "...return status from application show was '$STSDSP', script continuing..."
+
+log "...done..."
+
+#################################################################################
+#################################################################################
+
+log ""
+log "Script exiting..."
+
+exit 0
