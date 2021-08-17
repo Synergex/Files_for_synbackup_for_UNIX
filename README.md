@@ -7,6 +7,7 @@
 **Minimum Version:** 10.1.1<br />
 **Author:** Galen Carpenter
 <hr>
+
 **Additional Information:**
 			Using synbackup on Unix or Linux
 
