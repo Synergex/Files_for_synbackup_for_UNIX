@@ -6,7 +6,8 @@
 **Products:** Synergy DBL; Synergy DBMS<br />
 **Minimum Version:** 10.1.1<br />
 **Author:** Galen Carpenter
-<p><strong>Additional Information:</strong> 
+<hr>
+**Additional Information:**
 			Using synbackup on Unix or Linux
 
 When backing up Synergy databases, problems can arise if a file is in the
@@ -138,4 +139,4 @@ to find out how it is specified.  Then configure it to call the stop_APP.sh
 script to freeze the file writes and the start_APP.sh script to thaw the file
 writes.
 
-(This information is included in KB article 2357.)</p>
+(This information is included in KB article 2357.)
